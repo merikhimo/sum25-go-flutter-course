@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+	"lab03-backend/models"
 	"lab03-backend/storage"
 	"net/http"
 
@@ -10,12 +12,14 @@ import (
 // Handler holds the storage instance
 type Handler struct {
 	// TODO: Add storage field of type *storage.MemoryStorage
+	storage *storage.MemoryStorage
 }
 
 // NewHandler creates a new handler instance
 func NewHandler(storage *storage.MemoryStorage) *Handler {
 	// TODO: Return a new Handler instance with provided storage
-	return nil
+	handler := Handler{storage: storage}
+	return &handler
 }
 
 // SetupRoutes configures all API routes
@@ -41,6 +45,10 @@ func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	// Create successful API response
 	// Write JSON response with status 200
 	// Handle any errors appropriately
+	//messages := h.storage.GetAll()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
 }
 
 // CreateMessage handles POST /api/messages
@@ -87,6 +95,7 @@ func (h *Handler) GetHTTPStatus(w http.ResponseWriter, r *http.Request) {
 	// Create successful API response
 	// Write JSON response with status 200
 	// Handle parsing and validation errors appropriately
+
 }
 
 // HealthCheck handles GET /api/health
@@ -107,6 +116,12 @@ func (h *Handler) writeJSON(w http.ResponseWriter, status int, data interface{})
 	// Set status code
 	// Encode data as JSON and write to response
 	// Log any encoding errors
+	w.WriteHeader(status)
+	encoder := json.NewEncoder(w)
+	json.Marshal(data)
+	if err := encoder.Encode(data); err != nil {
+		w.Header().Set("Content-type", "application/json")
+	}
 }
 
 // Helper function to write error responses
@@ -114,6 +129,8 @@ func (h *Handler) writeError(w http.ResponseWriter, status int, message string) 
 	// TODO: Implement writeError helper
 	// Create APIResponse with Success: false and Error: message
 	// Use writeJSON to send the error response
+	res := models.APIResponse{Success: false, Data: "", Error: message}
+	h.writeJSON(w, status, res)
 }
 
 // Helper function to parse JSON request body
@@ -122,6 +139,10 @@ func (h *Handler) parseJSON(r *http.Request, dst interface{}) error {
 	// Create JSON decoder from request body
 	// Decode into destination interface
 	// Return any decoding errors
+	err := json.NewDecoder(r.Body).Decode(dst)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -146,6 +167,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	// Access-Control-Allow-Headers: Content-Type, Authorization
 	// Handle OPTIONS preflight requests
 	// Call next handler for non-OPTIONS requests
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// TODO: Implement CORS logic here
 		next.ServeHTTP(w, r)
