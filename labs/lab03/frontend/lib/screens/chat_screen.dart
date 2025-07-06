@@ -17,16 +17,26 @@ class _ChatScreenState extends State<ChatScreen> {
   // TODO: Add String? _error;
   // TODO: Add final TextEditingController _usernameController = TextEditingController();
   // TODO: Add final TextEditingController _messageController = TextEditingController();
+  final ApiService apiService = ApiService();
+  List<Message> messages = [];
+  bool _isLoading = false;
+  String? _error;
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _messageController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     // TODO: Call _loadMessages() to load initial data
+    _loadMessages();
   }
 
   @override
   void dispose() {
     // TODO: Dispose controllers and API service
+    _usernameController.dispose();
+    _messageController.dispose();
+    apiService.dispose();
     super.dispose();
   }
 

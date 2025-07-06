@@ -2,9 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"lab03-backend/models"
 	"lab03-backend/storage"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -72,30 +74,74 @@ func (h *Handler) UpdateMessage(w http.ResponseWriter, r *http.Request) {
 	// Create successful API response
 	// Write JSON response with status 200
 	// Handle validation, parsing, and storage errors appropriately
+	vars := mux.Vars(r)
+	idStr, ok := vars["id"]
+	if !ok {
+		h.writeJSON(w, http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "missing message ID in URL",
+		})
+		return
+	}
 }
 
 // DeleteMessage handles DELETE /api/messages/{id}
 func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement DeleteMessage handler
-	// Extract ID from URL path variables
-	// Delete message from storage
-	// Write response with status 204 (No Content)
-	// Handle parsing and storage errors appropriately
+	vars := mux.Vars(r)
+	idStr, ok := vars["id"]
+	if !ok {
+		h.writeJSON(w, http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "missing message ID in URL",
+		})
+		return
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id < 1 {
+		h.writeJSON(w, http.StatusBadRequest, models.APIResponse{
+			Success: false,
+			Error:   "invalid message ID",
+		})
+		return
+	}
+	err = h.storage.Delete(id)
+	if err != nil {
+		h.writeJSON(w, http.StatusNotFound, models.APIResponse{
+			Success: false,
+			Error:   "message not found",
+		})
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // GetHTTPStatus handles GET /api/status/{code}
 func (h *Handler) GetHTTPStatus(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement GetHTTPStatus handler
-	// Extract status code from URL path variables
-	// Validate status code (must be between 100-599)
-	// Create HTTPStatusResponse with:
-	//   - StatusCode: parsed code
-	//   - ImageURL: "https://http.cat/{code}"
-	//   - Description: HTTP status description
-	// Create successful API response
-	// Write JSON response with status 200
-	// Handle parsing and validation errors appropriately
+	vars := mux.Vars(r)
+	codeStr, ok := vars["code"]
+	if !ok {
+		h.writeJSON(w, http.StatusBadRequest,
+			models.APIResponse{Success: false, Error: "status code missing"})
+		return
+	}
+	code, err := strconv.Atoi(codeStr)
+	if err != nil || code < 100 || code > 599 {
+		h.writeJSON(w, http.StatusBadRequest,
+			models.APIResponse{Success: false, Error: "invalid status code"})
+		return
+	}
 
+	resp := models.HTTPStatusResponse{
+		StatusCode:  code,
+		ImageURL:    "https://http.cat/" + strconv.Itoa(code),
+		Description: getHTTPStatusDescription(code),
+	}
+
+	// 4. Оборачиваем в унифицированный API‑ответ и отправляем
+	h.writeJSON(w, http.StatusOK, models.APIResponse{
+		Success: true,
+		Data:    resp,
+	})
 }
 
 // HealthCheck handles GET /api/health
@@ -107,6 +153,7 @@ func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	//   - timestamp: current time
 	//   - total_messages: count from storage
 	// Write JSON response with status 200
+	//res := models.APIResponse{}
 }
 
 // Helper function to write JSON responses
@@ -116,11 +163,13 @@ func (h *Handler) writeJSON(w http.ResponseWriter, status int, data interface{})
 	// Set status code
 	// Encode data as JSON and write to response
 	// Log any encoding errors
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
+
 	encoder := json.NewEncoder(w)
-	json.Marshal(data)
 	if err := encoder.Encode(data); err != nil {
-		w.Header().Set("Content-type", "application/json")
+		// Логируем ошибку — можно использовать log, либо любой другой логгер
+		fmt.Printf("writeJSON: failed to encode JSON response: %v", err)
 	}
 }
 
@@ -148,14 +197,31 @@ func (h *Handler) parseJSON(r *http.Request, dst interface{}) error {
 
 // Helper function to get HTTP status description
 func getHTTPStatusDescription(code int) string {
-	// TODO: Implement getHTTPStatusDescription
-	// Return appropriate description for common HTTP status codes
-	// Use a switch statement or map to handle:
-	// 200: "OK", 201: "Created", 204: "No Content"
-	// 400: "Bad Request", 401: "Unauthorized", 404: "Not Found"
-	// 500: "Internal Server Error", etc.
-	// Return "Unknown Status" for unrecognized codes
-	return "Unknown Status"
+	switch code {
+	case 200:
+		return "OK"
+	case 201:
+		return "Created"
+	case 204:
+		return "No Content"
+	case 400:
+		return "Bad Request"
+	case 401:
+		return "Unauthorized"
+	case 404:
+		return "Not Found"
+	case 500:
+		return "Internal Server Error"
+	case 502:
+		return "Bad Gateway"
+	case 503:
+		return "Service Unavailable"
+	case 504:
+		return "Gateway Timeout"
+
+	default:
+		return "Unknown Status"
+	}
 }
 
 // CORS middleware
@@ -169,7 +235,13 @@ func corsMiddleware(next http.Handler) http.Handler {
 	// Call next handler for non-OPTIONS requests
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: Implement CORS logic here
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
